@@ -1,0 +1,134 @@
+import logging
+import os
+import matplotlib.pyplot as plt
+from config.parser import get_parser
+from utils.seed import set_global_seed
+from data.load_data import load_data
+from data.preprocess import preprocess_data, split_data
+from env.trading_env import StockPortfolioEnv
+from agents.build_agent import build_agent
+from stable_baselines3.common.callbacks import BaseCallback
+
+class LossCallback(BaseCallback):
+    """
+    Callback for capturing training losses
+    """
+    def __init__(self, verbose=0):
+        super().__init__(verbose)
+        self.losses = []
+        self.episode_rewards = []
+        
+    def _on_step(self) -> bool:
+        # Capture loss from the model's logger
+        if hasattr(self.model, 'logger'):
+            # Try different ways to get loss
+            if 'train/loss' in self.model.logger.name_to_value:
+                loss = self.model.logger.name_to_value['train/loss']
+                self.losses.append(loss)
+            elif hasattr(self.model, 'policy') and hasattr(self.model.policy, 'loss'):
+                try:
+                    loss = self.model.policy.loss.item()
+                    self.losses.append(loss)
+                except:
+                    pass
+        return True
+
+TECHNICAL_INDICATORS = [
+    'macd', 'boll_ub', 'boll_lb', 'rsi_30', 'cci_30', 'dx_30',
+    'close_30_sma', 'close_60_sma', 'change'
+]
+
+def setup_logging(log_path='results/logs/'):
+    os.makedirs(log_path, exist_ok=True)
+    logging.basicConfig(filename=os.path.join(log_path, 'training.log'), level=logging.INFO,
+                        format='%(asctime)s - %(levelname)s - %(message)s')
+
+def train_single_seed(algo, timesteps, seed, data_source, data_path, vnindex_path, save_path):
+    # Set seed
+    set_global_seed(seed)
+    
+    # Load data
+    df, vnindex_df = load_data(data_source, data_path, vnindex_path)
+    
+    # Preprocess
+    df = preprocess_data(df, vnindex_df)
+    
+    # Split
+    train, _ = split_data(df)
+    
+    # Clean train data (from notebook)
+    train = train.dropna(subset=['cov_list', 'return_list']).copy()
+    train = train.drop_duplicates(subset=['date', 'tic'], keep='last')
+    train = train.sort_values(['date', 'tic']).reset_index(drop=True)
+    train.index = train.date.factorize()[0]
+    
+    # Environment setup
+    stock_dimension = len(train.tic.unique())
+    state_space = stock_dimension
+    env_kwargs = {
+        "hmax": 100, 
+        "initial_amount": 10000000,
+        "transaction_cost_pct": 0.001, 
+        "state_space": state_space, 
+        "stock_dim": stock_dimension, 
+        "tech_indicator_list": TECHNICAL_INDICATORS, 
+        "action_space": stock_dimension, 
+        "reward_scaling": 1e-4,
+        "seed": seed
+    }
+    
+    env = StockPortfolioEnv(df=train, **env_kwargs)
+    env_sb, _ = env.get_sb_env()
+    
+    # Build agent
+    model = build_agent(algo, env_sb, seed)
+    
+    # Create loss callback
+    loss_callback = LossCallback()
+    
+    # Train with callback
+    model.learn(total_timesteps=timesteps, callback=loss_callback)
+    
+    # Plot and save loss diagram
+    if loss_callback.losses:
+        plots_dir = save_path.replace('models', 'plots')
+        os.makedirs(plots_dir, exist_ok=True)
+        plt.figure(figsize=(10, 6))
+        plt.plot(loss_callback.losses)
+        plt.title(f'Training Loss - {algo} (Seed {seed})')
+        plt.xlabel('Training Steps')
+        plt.ylabel('Loss')
+        plt.grid(True)
+        plt.savefig(os.path.join(plots_dir, f'{algo.lower()}_loss_seed_{seed}.png'))
+        plt.close()
+    
+    # Save model
+    os.makedirs(save_path, exist_ok=True)
+    model_path = os.path.join(save_path, f'{algo.lower()}_seed_{seed}.zip')
+    model.save(model_path)
+    
+    # Log
+    final_reward = env.portfolio_value  # Approximate
+    logging.info(f'Algo={algo} | Seed={seed} | Timesteps={timesteps} | Reward={final_reward}')
+    
+    return model
+
+def main():
+    parser = get_parser()
+    args = parser.parse_args()
+    
+    setup_logging()
+    
+    if args.n_seeds > 1:
+        models = []
+        for s in range(args.seed, args.seed + args.n_seeds):
+            model = train_single_seed(args.algo, args.timesteps, s, args.data_source, args.data_path, args.vnindex_path, args.save_path)
+            models.append(model)
+        # Compute mean and std of results
+        # For simplicity, just log
+        logging.info(f'Trained {args.n_seeds} seeds for {args.algo}')
+    else:
+        train_single_seed(args.algo, args.timesteps, args.seed, args.data_source, args.data_path, args.vnindex_path, args.save_path)
+
+if __name__ == "__main__":
+    main()
