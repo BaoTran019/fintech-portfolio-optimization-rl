@@ -87,7 +87,6 @@ celerybeat-schedule
 .env
 .venv
 venv/
-ENV/
 env.bak/
 venv.bak/
 # Note: env/ is NOT ignored because it contains project source code (trading_env.py)
