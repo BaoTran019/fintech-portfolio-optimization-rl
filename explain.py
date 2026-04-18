@@ -101,15 +101,31 @@ def compute_shap_explanation(model, env, n_samples=100, max_evals=200):
         return None
 
     states = np.array(states)
+    state_shape = states.shape[1:]
+
+    # Convert observations to flat feature vectors for SHAP
+    if states.ndim == 3:
+        states_flat = states.reshape(states.shape[0], -1)
+    else:
+        states_flat = states
+
+    def reshape_for_model(flat_states):
+        flat_states = np.array(flat_states)
+        if flat_states.ndim == 1:
+            flat_states = flat_states.reshape(1, -1)
+        if states.ndim == 3:
+            return flat_states.reshape((-1,) + state_shape)
+        return flat_states
 
     # Create SHAP explainer
-    def predict_fn(states):
-        actions, _ = model.predict(states, deterministic=True)
+    def predict_fn(flat_states):
+        obs = reshape_for_model(flat_states)
+        actions, _ = model.predict(obs, deterministic=True)
         return actions
 
     # Use a subset for explanation to avoid memory issues
-    background_states = states[:min(50, len(states))]
-    test_states = states[:min(20, len(states))]
+    background_states = states_flat[:min(50, len(states_flat))]
+    test_states = states_flat[:min(20, len(states_flat))]
 
     try:
         explainer = shap.KernelExplainer(predict_fn, background_states)
@@ -163,13 +179,20 @@ def explain_model(algo, seed, data_source='csv', data_path='dataset/5_vn30_vnsi_
         shap_values, test_states = result
 
         # Create feature names for plotting
-        stock_dim = len(env.df.tic.unique())
+        stock_dim = env.state.shape[1]
+        state_rows = env.state.shape[0]
         feature_names = []
-        for i in range(stock_dim):
-            feature_names.append(f'cov_{i}')
-        for indicator in TECHNICAL_INDICATORS:
-            for i in range(stock_dim):
-                feature_names.append(f'{indicator}_{i}')
+
+        # Generate names for flattened covariance and technical indicator rows
+        for row in range(state_rows):
+            if row < stock_dim:
+                for col in range(stock_dim):
+                    feature_names.append(f'cov_{row}_{col}')
+            else:
+                indicator_idx = row - stock_dim
+                indicator_name = TECHNICAL_INDICATORS[indicator_idx]
+                for col in range(stock_dim):
+                    feature_names.append(f'{indicator_name}_{col}')
 
         # Plot SHAP summary
         plot_shap_summary(shap_values, feature_names, algo, seed)

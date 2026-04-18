@@ -89,13 +89,27 @@ def model_predict(model, env):
     df_actions = env.save_action_memory()
     return df_daily_return, df_actions
 
-def compute_metrics(df_daily_return):
+def compute_metrics(df_daily_return, initial_amount=10000000):
     """
-    Compute Sharpe, etc.
+    Compute performance metrics for a portfolio.
     """
     returns = df_daily_return['daily_return']
+    cumulative_return = (1 + returns).prod() - 1
+    annual_return = ((1 + cumulative_return) ** (252 / len(returns))) - 1 if len(returns) > 0 else 0
     sharpe = (252 ** 0.5) * returns.mean() / returns.std() if returns.std() != 0 else 0
-    metrics = pd.Series({'Sharpe': sharpe, 'Mean Return': returns.mean(), 'Std Return': returns.std()})
+    account_value = initial_amount * (1 + returns).cumprod()
+    peak_value = account_value.cummax()
+    drawdown = (account_value - peak_value) / peak_value
+    max_drawdown = drawdown.min()
+
+    metrics = pd.Series({
+        'Annual Return': annual_return,
+        'Cumulative Return': cumulative_return,
+        'Sharpe': sharpe,
+        'Mean Return': returns.mean(),
+        'Std Return': returns.std(),
+        'Max Drawdown': max_drawdown
+    })
     return metrics
 
 def main():

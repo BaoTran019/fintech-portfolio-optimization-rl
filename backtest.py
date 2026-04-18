@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from config.parser import get_parser
@@ -11,6 +12,85 @@ TECHNICAL_INDICATORS = [
     'macd', 'boll_ub', 'boll_lb', 'rsi_30', 'cci_30', 'dx_30',
     'close_30_sma', 'close_60_sma', 'change'
 ]
+
+def compute_min_variance_weights(cov_matrix):
+    cov_matrix = np.array(cov_matrix, dtype=float)
+    inv_cov = np.linalg.pinv(cov_matrix)
+    weights = inv_cov.dot(np.ones(inv_cov.shape[0]))
+    weights = np.maximum(weights, 0)
+    if weights.sum() <= 0:
+        weights = np.ones_like(weights) / len(weights)
+    else:
+        weights = weights / weights.sum()
+    return weights
+
+
+def build_min_variance_benchmark(test, initial_amount=10000000):
+    price_matrix = test.pivot_table(index='date', columns='tic', values='close')
+    returns = price_matrix.pct_change().shift(-1)
+    dates = sorted(test.date.unique())
+    benchmark_values = [initial_amount]
+    benchmark_returns = []
+    weight_records = []
+
+    for date in dates[:-1]:
+        row = test[test.date == date].iloc[0]
+        cov = row['cov_list']
+        weights = compute_min_variance_weights(cov)
+        next_returns = returns.loc[date].values
+        benchmark_returns.append(np.dot(weights, next_returns))
+        benchmark_values.append(benchmark_values[-1] * (1 + benchmark_returns[-1]))
+        weight_records.append(weights)
+
+    benchmark_df = pd.DataFrame({
+        'date': dates[1:],
+        'benchmark_return': benchmark_returns,
+        'benchmark_value': benchmark_values[1:]
+    })
+    weight_df = pd.DataFrame(weight_records, columns=price_matrix.columns, index=dates[:-1])
+    weight_df.index.name = 'date'
+    return benchmark_df, weight_df
+
+
+def plot_comparison(df_daily_return, benchmark_df, algo, seed, save_path='results/'):
+    os.makedirs(save_path, exist_ok=True)
+    account_values = (1 + df_daily_return['daily_return']).cumprod() * 10000000
+    benchmark_values = benchmark_df['benchmark_value']
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(df_daily_return['date'], account_values, label=f'{algo} Portfolio')
+    plt.plot(benchmark_df['date'], benchmark_values, label='Min-Variance Benchmark')
+    plt.title(f'Account Value Comparison - {algo} Seed {seed}')
+    plt.xlabel('Date')
+    plt.ylabel('Account Value')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(os.path.join(save_path, f'{algo.lower()}_seed_{seed}_account_value_comparison.png'))
+    plt.close()
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(df_daily_return['date'], (1 + df_daily_return['daily_return']).cumprod() - 1, label=f'{algo} Portfolio')
+    plt.plot(benchmark_df['date'], (benchmark_df['benchmark_value'] / benchmark_df['benchmark_value'].iloc[0]) - 1, label='Min-Variance Benchmark')
+    plt.title(f'Cumulative Return Comparison - {algo} Seed {seed}')
+    plt.xlabel('Date')
+    plt.ylabel('Cumulative Return')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(os.path.join(save_path, f'{algo.lower()}_seed_{seed}_cumulative_return_comparison.png'))
+    plt.close()
+
+
+def plot_stock_distribution(df_actions, algo, seed, save_path='results/'):
+    os.makedirs(save_path, exist_ok=True)
+    latest_weights = df_actions.iloc[-1].values
+    tickers = df_actions.columns.tolist()
+
+    plt.figure(figsize=(10, 10))
+    plt.pie(latest_weights, labels=tickers, autopct='%1.1f%%', startangle=140)
+    plt.title(f'Stock Distribution - {algo} Seed {seed}')
+    plt.savefig(os.path.join(save_path, f'{algo.lower()}_seed_{seed}_distribution.png'))
+    plt.close()
+
 
 def backtest(algo, seed, data_source='csv', data_path='dataset/5_vn30_vnsi_symbols_data.xlsx', vnindex_path='dataset/vnindex.xlsx'):
     # Load data
@@ -54,19 +134,18 @@ def backtest(algo, seed, data_source='csv', data_path='dataset/5_vn30_vnsi_symbo
     # Compute metrics
     metrics = compute_metrics(df_daily_return)
     
-    # Plot cumulative return
-    plt.figure(figsize=(10, 6))
-    plt.plot(df_daily_return['date'], (df_daily_return['daily_return'] + 1).cumprod() - 1)
-    plt.title(f'Cumulative Return - {algo} Seed {seed}')
-    plt.xlabel('Date')
-    plt.ylabel('Cumulative Return')
-    plt.savefig(f'results/{algo}_seed_{seed}_backtest.png')
-    plt.close()
-    
     # Save results
     os.makedirs('results/', exist_ok=True)
-    df_daily_return.to_csv(f'results/{algo}_seed_{seed}_returns.csv')
+    os.makedirs('results/metrics/', exist_ok=True)
+    df_daily_return.to_csv(f'results/{algo}_seed_{seed}_returns.csv', index=False)
     df_actions.to_csv(f'results/{algo}_seed_{seed}_actions.csv')
+    metrics.to_csv(f'results/metrics/{algo.lower()}_seed_{seed}_metrics.csv')
+
+    # Generate benchmark and plots
+    benchmark_df, benchmark_weights = build_min_variance_benchmark(test)
+    plot_comparison(df_daily_return, benchmark_df, algo, seed, save_path='results/')
+    plot_stock_distribution(df_actions, algo, seed, save_path='results/')
+    benchmark_weights.to_csv(f'results/{algo.lower()}_seed_{seed}_benchmark_weights.csv')
     
     print(f"Backtest completed for {algo} seed {seed}")
     print(metrics)

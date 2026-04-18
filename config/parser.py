@@ -5,7 +5,7 @@ def get_parser():
     
     # Required arguments
     parser.add_argument('--algo', type=str, required=True, choices=['A2C', 'PPO', 'DDPG', 'SAC', 'TD3'], help='Algorithm to use')
-    parser.add_argument('--timesteps', type=int, required=True, help='Number of training timesteps')
+    parser.add_argument('--timesteps', type=int, required=False, default=None, help='Number of training timesteps (required only for train.py and run.py)')
     parser.add_argument('--seed', type=int, required=True, help='Random seed')
     
     # Optional arguments

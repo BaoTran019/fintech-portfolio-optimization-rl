@@ -116,6 +116,9 @@ def train_single_seed(algo, timesteps, seed, data_source, data_path, vnindex_pat
 def main():
     parser = get_parser()
     args = parser.parse_args()
+
+    if args.timesteps is None:
+        parser.error("--timesteps is required for training")
     
     setup_logging()
     
