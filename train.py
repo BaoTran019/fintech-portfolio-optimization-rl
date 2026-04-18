@@ -21,16 +21,21 @@ class LossCallback(BaseCallback):
     def _on_step(self) -> bool:
         # Capture loss from the model's logger
         if hasattr(self.model, 'logger'):
-            # Try different ways to get loss
-            if 'train/loss' in self.model.logger.name_to_value:
-                loss = self.model.logger.name_to_value['train/loss']
-                self.losses.append(loss)
-            elif hasattr(self.model, 'policy') and hasattr(self.model.policy, 'loss'):
+            logger_values = getattr(self.model.logger, 'name_to_value', {}) or {}
+            loss = None
+            for key in ['train/loss', 'loss', 'train/policy_loss', 'policy_loss', 'train/value_loss', 'value_loss']:
+                if key in logger_values:
+                    loss = logger_values[key]
+                    break
+
+            if loss is None and hasattr(self.model, 'policy') and hasattr(self.model.policy, 'loss'):
                 try:
                     loss = self.model.policy.loss.item()
-                    self.losses.append(loss)
-                except:
-                    pass
+                except Exception:
+                    loss = None
+
+            if loss is not None:
+                self.losses.append(loss)
         return True
 
 TECHNICAL_INDICATORS = [
@@ -91,7 +96,12 @@ def train_single_seed(algo, timesteps, seed, data_source, data_path, vnindex_pat
     
     # Plot and save loss diagram
     if loss_callback.losses:
-        plots_dir = save_path.replace('models', 'plots')
+        save_dir = os.path.normpath(save_path)
+        if os.path.basename(save_dir) == 'models':
+            plots_dir = os.path.join(os.path.dirname(save_dir), 'plots')
+        else:
+            plots_dir = os.path.join(save_dir, 'plots')
+        plots_dir = os.path.normpath(plots_dir)
         os.makedirs(plots_dir, exist_ok=True)
         plt.figure(figsize=(10, 6))
         plt.plot(loss_callback.losses)
@@ -99,8 +109,12 @@ def train_single_seed(algo, timesteps, seed, data_source, data_path, vnindex_pat
         plt.xlabel('Training Steps')
         plt.ylabel('Loss')
         plt.grid(True)
-        plt.savefig(os.path.join(plots_dir, f'{algo.lower()}_loss_seed_{seed}.png'))
+        loss_plot_path = os.path.join(plots_dir, f'{algo.lower()}_loss_seed_{seed}.png')
+        plt.savefig(loss_plot_path)
         plt.close()
+        logging.info(f'Training loss plot saved to {loss_plot_path}')
+    else:
+        logging.warning('No training loss values captured; loss plot was not saved.')
     
     # Save model
     os.makedirs(save_path, exist_ok=True)
