@@ -48,8 +48,8 @@ class StockPortfolioEnv(gym.Env):
 
         # load data from a pandas dataframe
         self.data = self.df.loc[self.day, :]
-        self.covs = self.data['cov_list'].values[0]
-        self.state = np.append(np.array(self.covs), [self.data[tech].values.tolist() for tech in self.tech_indicator_list], axis=0)
+        self.covs = self.data['cov_list']
+        self.state = np.append(np.array(self.covs), np.array([self.data[tech].values for tech in self.tech_indicator_list]), axis=0)
         self.terminal = False     
         self.turbulence_threshold = turbulence_threshold        
         # initialize state: initial portfolio return + individual stock return + individual weights
