@@ -97,7 +97,7 @@ def backtest(algo, seed, processed_data_path='dataset/processed/processed.csv', 
     df = load_processed_data(processed_data_path)
     
     # Split
-    _, _, test = split_data(df, config)
+    _, _, test = split_data(df, config = config)
     
     # Clean test data
     unique_tickers = test.tic.unique()
