@@ -3,8 +3,8 @@ import os
 import matplotlib.pyplot as plt
 from config.parser import get_parser
 from utils.seed import set_global_seed
-from data.load_data import load_data
-from data.preprocess import preprocess_data, split_data
+from data.load_data import load_processed_data
+from data.preprocess import split_data
 from env.trading_env import StockPortfolioEnv
 from agents.build_agent import build_agent
 from stable_baselines3.common.callbacks import BaseCallback
@@ -48,20 +48,17 @@ def setup_logging(log_path='results/logs/'):
     logging.basicConfig(filename=os.path.join(log_path, 'training.log'), level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s')
 
-def train_single_seed(algo, timesteps, seed, data_source, data_path, vnindex_path, save_path):
+def train_single_seed(algo, timesteps, seed, processed_data_path, save_path, config):
     # Set seed
     set_global_seed(seed)
-    
-    # Load data
-    df, vnindex_df = load_data(data_source, data_path, vnindex_path)
-    
-    # Preprocess
-    df = preprocess_data(df, vnindex_df)
-    
-    # Split
-    train, _ = split_data(df)
-    
-    # Clean train data (from notebook)
+
+    # Load preprocessed dataset
+    df = load_processed_data(processed_data_path)
+
+    # Split data by time into train/validation/test
+    train, val, test = split_data(df, config)
+
+    # Clean train data
     train = train.dropna(subset=['cov_list', 'return_list']).copy()
     train = train.drop_duplicates(subset=['date', 'tic'], keep='last')
     train = train.sort_values(['date', 'tic']).reset_index(drop=True)
@@ -139,13 +136,11 @@ def main():
     if args.n_seeds > 1:
         models = []
         for s in range(args.seed, args.seed + args.n_seeds):
-            model = train_single_seed(args.algo, args.timesteps, s, args.data_source, args.data_path, args.vnindex_path, args.save_path)
+            model = train_single_seed(args.algo, args.timesteps, s, args.processed_data_path, args.save_path, args)
             models.append(model)
-        # Compute mean and std of results
-        # For simplicity, just log
         logging.info(f'Trained {args.n_seeds} seeds for {args.algo}')
     else:
-        train_single_seed(args.algo, args.timesteps, args.seed, args.data_source, args.data_path, args.vnindex_path, args.save_path)
+        train_single_seed(args.algo, args.timesteps, args.seed, args.processed_data_path, args.save_path, args)
 
 if __name__ == "__main__":
     main()

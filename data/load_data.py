@@ -11,15 +11,22 @@ def load_data(data_source='csv', data_path='dataset/5_vn30_vnsi_symbols_data.xls
         # For now, load from file
         pass
     
-    # Load main data
     if os.path.exists(data_path):
         df = pd.read_excel(data_path)
     else:
         raise FileNotFoundError(f"Data file not found: {data_path}")
     
-    # Load VNINDEX if exists
     vnindex_df = None
     if os.path.exists(vnindex_path):
         vnindex_df = pd.read_excel(vnindex_path)
     
     return df, vnindex_df
+
+
+def load_processed_data(processed_path='dataset/processed/processed.csv'):
+    """
+    Load the processed dataset saved by preprocess_data.py.
+    """
+    if not os.path.exists(processed_path):
+        raise FileNotFoundError(f"Processed data file not found: {processed_path}")
+    return pd.read_csv(processed_path, parse_dates=['date'])

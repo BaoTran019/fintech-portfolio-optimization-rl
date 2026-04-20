@@ -3,8 +3,8 @@ import argparse
 import numpy as np
 from stable_baselines3 import A2C, PPO, DDPG, SAC, TD3
 import matplotlib.pyplot as plt
-from data.load_data import load_data
-from data.preprocess import preprocess_data, split_data
+from data.load_data import load_processed_data
+from data.preprocess import split_data
 from env.trading_env import StockPortfolioEnv
 
 TECHNICAL_INDICATORS = [
@@ -36,16 +36,15 @@ def load_trained_model(algo, seed, model_path='results/models/'):
 
     return model
 
-def create_test_environment(data_source, data_path, vnindex_path, seed):
+def create_test_environment(processed_data_path, seed):
     """
     Create the test environment for SHAP analysis.
     """
-    # Load and preprocess data
-    df, vnindex_df = load_data(data_source, data_path, vnindex_path)
-    df = preprocess_data(df, vnindex_df)
+    # Load processed data
+    df = load_processed_data(processed_data_path)
 
     # Split data (use test set)
-    _, test = split_data(df)
+    _, _, test = split_data(df)
 
     # Clean test data
     unique_tickers = test.tic.unique()
@@ -159,8 +158,7 @@ def plot_shap_summary(shap_values, feature_names, algo, seed, save_path='results
     except Exception as e:
         print(f"Error creating SHAP plot: {e}")
 
-def explain_model(algo, seed, data_source='csv', data_path='dataset/5_vn30_vnsi_symbols_data.xlsx',
-                 vnindex_path='dataset/vnindex.xlsx', model_path='results/models/', n_samples=100):
+def explain_model(algo, seed, processed_data_path='dataset/processed/processed.csv', model_path='results/models/', n_samples=100):
     """
     Main function to explain a trained model using SHAP.
     """
@@ -170,7 +168,7 @@ def explain_model(algo, seed, data_source='csv', data_path='dataset/5_vn30_vnsi_
     model = load_trained_model(algo, seed, model_path)
 
     # Create test environment
-    env = create_test_environment(data_source, data_path, vnindex_path, seed)
+    env = create_test_environment(processed_data_path, seed)
 
     # Compute SHAP values
     result = compute_shap_explanation(model, env, n_samples)
@@ -206,12 +204,8 @@ def main():
     parser.add_argument('--algo', type=str, required=True, choices=['A2C', 'PPO', 'DDPG', 'SAC', 'TD3'],
                        help='Algorithm to explain')
     parser.add_argument('--seed', type=int, required=True, help='Seed of the trained model')
-    parser.add_argument('--data_source', type=str, default='csv', choices=['api', 'csv'],
-                       help='Data source (default: csv)')
-    parser.add_argument('--data_path', type=str, default='dataset/5_vn30_vnsi_symbols_data.xlsx',
-                       help='Path to main data file')
-    parser.add_argument('--vnindex_path', type=str, default='dataset/vnindex.xlsx',
-                       help='Path to VNINDEX data file')
+    parser.add_argument('--processed_data_path', type=str, default='dataset/processed/processed.csv',
+                       help='Path to processed dataset CSV file')
     parser.add_argument('--model_path', type=str, default='results/models/',
                        help='Path to trained models')
     parser.add_argument('--n_samples', type=int, default=100,
@@ -222,9 +216,7 @@ def main():
     explain_model(
         algo=args.algo,
         seed=args.seed,
-        data_source=args.data_source,
-        data_path=args.data_path,
-        vnindex_path=args.vnindex_path,
+        processed_data_path=args.processed_data_path,
         model_path=args.model_path,
         n_samples=args.n_samples
     )

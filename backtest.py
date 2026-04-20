@@ -4,8 +4,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from config.parser import get_parser
 from validate import load_model, model_predict, compute_metrics
-from data.load_data import load_data
-from data.preprocess import preprocess_data, split_data
+from data.load_data import load_processed_data
+from data.preprocess import split_data
 from env.trading_env import StockPortfolioEnv
 
 TECHNICAL_INDICATORS = [
@@ -92,13 +92,12 @@ def plot_stock_distribution(df_actions, algo, seed, save_path='results/'):
     plt.close()
 
 
-def backtest(algo, seed, data_source='csv', data_path='dataset/5_vn30_vnsi_symbols_data.xlsx', vnindex_path='dataset/vnindex.xlsx'):
-    # Load data
-    df, vnindex_df = load_data(data_source, data_path, vnindex_path)
-    df = preprocess_data(df, vnindex_df)
+def backtest(algo, seed, processed_data_path='dataset/processed/processed.csv', config=None):
+    # Load processed data
+    df = load_processed_data(processed_data_path)
     
     # Split
-    _, test = split_data(df)
+    _, _, test = split_data(df, config)
     
     # Clean test data
     unique_tickers = test.tic.unique()
@@ -154,7 +153,7 @@ def main():
     parser = get_parser()
     args = parser.parse_args()
     
-    backtest(args.algo, args.seed, args.data_source, args.data_path, args.vnindex_path)
+    backtest(args.algo, args.seed, args.processed_data_path, args)
 
 if __name__ == "__main__":
     main()
