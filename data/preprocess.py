@@ -88,7 +88,7 @@ def add_covariance_matrix(df, lookback=252):
         return_list.append(return_lookback)
         
         covs = return_lookback.cov().values
-        cov_list.append(covs)
+        cov_list.append(covs.tolist())
     
     df_cov = pd.DataFrame({'date': df.date.unique()[lookback:], 'cov_list': cov_list, 'return_list': return_list})
     df = df.merge(df_cov, on='date')
