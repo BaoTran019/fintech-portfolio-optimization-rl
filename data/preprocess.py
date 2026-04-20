@@ -76,22 +76,24 @@ def add_covariance_matrix(df, lookback=252):
     Add rolling covariance matrix.
     """
     df = df.sort_values(['date', 'tic'], ignore_index=True)
-    df.index = df['date'].factorize()[0]
-
+    df.index = df.date.factorize()[0]
+    
     cov_list = []
     return_list = []
-
-    for i in range(lookback, len(df['date'].unique())):
+    
+    for i in range(lookback, len(df.index.unique())):
         data_lookback = df.loc[i - lookback:i, :]
         price_lookback = data_lookback.pivot_table(index='date', columns='tic', values='close')
         return_lookback = price_lookback.pct_change().dropna()
         return_list.append(return_lookback)
+        
         covs = return_lookback.cov().values
         cov_list.append(covs)
-
-    df_cov = pd.DataFrame({'date': df['date'].unique()[lookback:], 'cov_list': cov_list, 'return_list': return_list})
+    
+    df_cov = pd.DataFrame({'date': df.date.unique()[lookback:], 'cov_list': cov_list, 'return_list': return_list})
     df = df.merge(df_cov, on='date')
     df = df.sort_values(['date', 'tic']).reset_index(drop=True)
+    
     return df
 
 
