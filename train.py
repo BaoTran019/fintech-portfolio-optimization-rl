@@ -56,7 +56,7 @@ def train_single_seed(algo, timesteps, seed, processed_data_path, save_path, con
     df = load_processed_data(processed_data_path)
 
     # Split data by time into train/validation/test
-    train, val, test = split_data(df, config)
+    train, val, test = split_data(df, config = config)
 
     # Clean train data
     train = train.dropna(subset=['cov_list', 'return_list']).copy()
