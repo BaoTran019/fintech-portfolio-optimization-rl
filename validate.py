@@ -32,19 +32,19 @@ def validate(algo, seed, processed_data_path='dataset/processed/processed.csv', 
     df = load_processed_data(processed_data_path)
     
     # Split
-    _, _, test = split_data(df, config)
+    _, validate, _ = split_data(df, config = config)
     
-    # Clean test data
-    unique_tickers = test.tic.unique()
-    test = test[test.tic.isin(unique_tickers)]
-    test = test.sort_values(['date', 'tic'])
-    test = test.drop_duplicates(subset=['date', 'tic'], keep='last')
-    test = test.dropna(subset=['cov_list', 'return_list'])
-    test = test.sort_values(['date', 'tic']).reset_index(drop=True)
-    test.index = test.date.factorize()[0]
+    # Clean validate data
+    unique_tickers = validate.tic.unique()
+    validate = validate[validate.tic.isin(unique_tickers)]
+    validate = validate.sort_values(['date', 'tic'])
+    validate = validate.drop_duplicates(subset=['date', 'tic'], keep='last')
+    validate = validate.dropna(subset=['cov_list', 'return_list'])
+    validate = validate.sort_values(['date', 'tic']).reset_index(drop=True)
+    validate.index = validate.date.factorize()[0]
     
     # Environment
-    stock_dimension = len(test.tic.unique())
+    stock_dimension = len(validate.tic.unique())
     state_space = stock_dimension
     env_kwargs = {
         "hmax": 100, 
@@ -57,7 +57,7 @@ def validate(algo, seed, processed_data_path='dataset/processed/processed.csv', 
         "reward_scaling": 1e-4
     }
     
-    env = StockPortfolioEnv(df=test, **env_kwargs)
+    env = StockPortfolioEnv(df=validate, **env_kwargs)
     
     # Load model
     model = load_model(algo, seed)

@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import ast
 
 def load_data(data_source='csv', data_path='dataset/5_vn30_vnsi_symbols_data.xlsx', vnindex_path='dataset/vnindex.xlsx'):
     """
@@ -29,4 +30,7 @@ def load_processed_data(processed_path='dataset/processed/processed.csv'):
     """
     if not os.path.exists(processed_path):
         raise FileNotFoundError(f"Processed data file not found: {processed_path}")
-    return pd.read_csv(processed_path, parse_dates=['date'])
+    df = pd.read_csv(processed_path, parse_dates=['date'])
+
+    df["cov_list"] = df["cov_list"].apply(ast.literal_eval)
+    return df
