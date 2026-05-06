@@ -83,13 +83,19 @@ def train_single_seed(algo, timesteps, seed, processed_data_path, save_path, con
     env_sb, _ = env.get_sb_env()
     
     # Build agent
-    model = build_agent(algo, env_sb, seed)
+    agent, model = build_agent(algo, env_sb, seed)
     
     # Create loss callback
     loss_callback = LossCallback()
     
-    # Train with callback
-    model.learn(total_timesteps=timesteps, callback=loss_callback)
+    # Train with FinRL wrapper
+    trained_model = agent.train_model(
+        model=model,
+        tb_log_name=algo.lower(),
+        total_timesteps=timesteps,
+        callback=loss_callback
+    )
+    model = trained_model
     
     # Plot and save loss diagram
     if loss_callback.losses:
