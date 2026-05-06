@@ -5,7 +5,7 @@ def build_agent(algo, env, seed):
     Build and return the RL agent and model based on algorithm.
     """
     algo_key = algo.lower()
-    agent = DRLAgent(env=env, seed=seed)
+    agent = DRLAgent(env=env)
 
     if algo_key == 'a2c':
         model_kwargs = {"n_steps": 10, "ent_coef": 0.005, "learning_rate": 0.0001}
