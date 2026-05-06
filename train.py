@@ -58,6 +58,7 @@ def train_single_seed(algo, timesteps, seed, processed_data_path, save_path, con
     # Train with FinRL wrapper
     trained_model = agent.train_model(
         model=model,
+        tb_log_name=algo.lower(),
         total_timesteps=timesteps
     )
     model = trained_model
