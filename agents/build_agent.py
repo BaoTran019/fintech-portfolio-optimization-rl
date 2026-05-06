@@ -5,14 +5,14 @@ def build_agent(algo, env, seed):
     Build and return the RL agent and model based on algorithm.
     """
     algo_key = algo.lower()
-    agent = DRLAgent(env=env)
+    agent = DRLAgent(env=env, seed=seed)
 
     if algo_key == 'a2c':
-        model_kwargs = {"n_steps": 10, "ent_coef": 0.005, "learning_rate": 0.0001, "seed": seed}
+        model_kwargs = {"n_steps": 10, "ent_coef": 0.005, "learning_rate": 0.0001}
     elif algo_key == 'ppo':
-        model_kwargs = {"n_steps": 2048, "ent_coef": 0.005, "learning_rate": 0.0001, "batch_size": 128, "seed": seed}
+        model_kwargs = {"n_steps": 2048, "ent_coef": 0.005, "learning_rate": 0.0001, "batch_size": 128}
     elif algo_key in ('ddpg', 'sac', 'td3'):
-        model_kwargs = {"seed": seed}
+        model_kwargs = {}
     else:
         raise ValueError(f"Unsupported algorithm: {algo}")
 
