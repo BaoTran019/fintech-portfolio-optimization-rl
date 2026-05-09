@@ -98,9 +98,9 @@ def add_covariance_matrix(df, lookback=252):
 
 
 def split_data(df,
-               train_start='2015-01-01', train_end='2023-12-31',
-               val_start='2024-01-01', val_end='2024-12-31',
-               test_start='2025-01-01', test_end='2025-12-31',
+               train_start='2015-01-01', train_end='2021-12-31',
+               val_start='2022-01-01', val_end='2023-12-31',
+               test_start='2024-01-01', test_end='2025-12-31',
                config=None):
     """
     Split a preprocessed dataframe into train, validation, and test sets based on explicit date boundaries.
