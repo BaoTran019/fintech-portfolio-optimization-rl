@@ -22,11 +22,6 @@ TECHNICAL_INDICATORS = [
     'change'
 ]
 
-STOCKS = [
-    'FPT', 'GAS', 'HPG', 'MSN', 'MWG',
-    'SSI', 'STB', 'VCB', 'VIC', 'VNM'
-]
-
 
 # =========================================================
 # CREATE ENV
@@ -57,9 +52,9 @@ def create_environment(processed_data_path, seed=42):
     }
 
     env = StockPortfolioEnv(df=test, **env_kwargs)
+    stocks = sorted(test.tic.unique().tolist())
 
-    return env
-
+    return env, stocks
 
 # =========================================================
 # COLLECT STATES
@@ -160,7 +155,7 @@ def explain_stock(
 
     os.makedirs("results/shap", exist_ok=True)
 
-    stock_idx = STOCKS.index(stock_name)
+    stock_idx = stocks.index(stock_name)
 
     print(f"\nExplaining stock: {stock_name}")
     print(f"Stock index: {stock_idx}")
@@ -175,7 +170,7 @@ def explain_stock(
     # ENV
     # -----------------------------------------------------
 
-    env = create_environment(processed_data_path, seed)
+    env, stocks = create_environment(processed_data_path, seed)
 
     # -----------------------------------------------------
     # COLLECT STATES
@@ -287,6 +282,40 @@ def explain_stock(
     print(f"\nSaved waterfall plot:")
     print(f"results/shap/shap_waterfall_{stock_name}.png")
 
+# =========================================================
+# Explain all stocks
+# =========================================================
+def explain_all_stocks(
+    model_path,
+    processed_data_path,
+    n_samples=200,
+    background_size=50,
+    seed=42
+):
+
+    env, stocks = create_environment(
+        processed_data_path,
+        seed
+    )
+
+    print("\nDetected stocks:")
+    print(stocks)
+
+    for stock_name in stocks:
+
+        print("\n" + "="*60)
+        print(f"EXPLAINING: {stock_name}")
+        print("="*60)
+
+        explain_stock(
+            model_path=model_path,
+            processed_data_path=processed_data_path,
+            stock_name=stock_name,
+            n_samples=n_samples,
+            background_size=background_size,
+            seed=seed
+        )
+
 
 # =========================================================
 # RUN
@@ -299,6 +328,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--algo", type=str, default="PPO")
+
     parser.add_argument("--seed", type=int, default=42)
 
     parser.add_argument(
@@ -309,12 +339,14 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    model_path = f"results/models/{args.algo.lower()}_seed_{args.seed}.zip"
+    model_path = (
+        f"results/models/"
+        f"{args.algo.lower()}_seed_{args.seed}.zip"
+    )
 
-    explain_stock(
+    explain_all_stocks(
         model_path=model_path,
         processed_data_path=args.processed_data_path,
-        stock_name="MWG",
         n_samples=200,
         background_size=50,
         seed=args.seed
