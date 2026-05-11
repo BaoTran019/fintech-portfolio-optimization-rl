@@ -1,68 +1,54 @@
 import os
-import argparse
+import shap
 import numpy as np
-from stable_baselines3 import A2C, PPO, DDPG, SAC, TD3
 import matplotlib.pyplot as plt
+
+from stable_baselines3 import PPO
+
 from data.load_data import load_processed_data
 from data.preprocess import split_data
 from env.trading_env import StockPortfolioEnv
 
+
 TECHNICAL_INDICATORS = [
-    'macd', 'boll_ub', 'boll_lb', 'rsi_30', 'cci_30', 'dx_30',
-    'close_30_sma', 'close_60_sma', 'change'
+    'macd',
+    'boll_ub',
+    'boll_lb',
+    'rsi_30',
+    'cci_30',
+    'dx_30',
+    'close_30_sma',
+    'close_60_sma',
+    'change'
 ]
 
-def load_trained_model(algo, seed, model_path='results/models/'):
-    """
-    Load a trained model from file.
-    """
-    model_file = os.path.join(model_path, f'{algo.lower()}_seed_{seed}.zip')
+STOCKS = [
+    'FPT', 'GAS', 'HPG', 'MSN', 'MWG',
+    'SSI', 'STB', 'VCB', 'VIC', 'VNM'
+]
 
-    if not os.path.exists(model_file):
-        raise FileNotFoundError(f"Model file not found: {model_file}")
 
-    if algo == 'A2C':
-        model = A2C.load(model_file)
-    elif algo == 'PPO':
-        model = PPO.load(model_file)
-    elif algo == 'DDPG':
-        model = DDPG.load(model_file)
-    elif algo == 'SAC':
-        model = SAC.load(model_file)
-    elif algo == 'TD3':
-        model = TD3.load(model_file)
-    else:
-        raise ValueError(f"Unsupported algorithm: {algo}")
+# =========================================================
+# CREATE ENV
+# =========================================================
 
-    return model
+def create_environment(processed_data_path, seed=42):
 
-def create_test_environment(processed_data_path, seed):
-    """
-    Create the test environment for SHAP analysis.
-    """
-    # Load processed data
     df = load_processed_data(processed_data_path)
 
-    # Split data (use test set)
     _, _, test = split_data(df)
 
-    # Clean test data
-    unique_tickers = test.tic.unique()
-    test = test[test.tic.isin(unique_tickers)]
-    test = test.sort_values(['date', 'tic'])
-    test = test.drop_duplicates(subset=['date', 'tic'], keep='last')
-    test = test.dropna(subset=['cov_list', 'return_list'])
     test = test.sort_values(['date', 'tic']).reset_index(drop=True)
+
     test.index = test.date.factorize()[0]
 
-    # Environment setup
     stock_dimension = len(test.tic.unique())
-    state_space = stock_dimension
+
     env_kwargs = {
         "hmax": 100,
         "initial_amount": 10000000,
         "transaction_cost_pct": 0.001,
-        "state_space": state_space,
+        "state_space": stock_dimension,
         "stock_dim": stock_dimension,
         "tech_indicator_list": TECHNICAL_INDICATORS,
         "action_space": stock_dimension,
@@ -71,155 +57,248 @@ def create_test_environment(processed_data_path, seed):
     }
 
     env = StockPortfolioEnv(df=test, **env_kwargs)
+
     return env
 
-def compute_shap_explanation(model, env, n_samples=100, max_evals=200):
-    """
-    Compute SHAP values for the trained model.
-    """
-    try:
-        import shap
-    except ImportError:
-        print("SHAP not installed. Install with: pip install shap")
-        return None
 
-    print(f"Computing SHAP values with {n_samples} samples...")
+# =========================================================
+# COLLECT STATES
+# =========================================================
 
-    # Sample states from environment
+def collect_states(model, env, n_samples=200):
+
     states = []
-    env.reset()
+
+    state = env.reset()
+
     for _ in range(n_samples):
-        action, _ = model.predict(env.state)  # Use current state
-        state, _, done, _ = env.step(action)
-        states.append(state)
+
+        action, _ = model.predict(state, deterministic=True)
+
+        next_state, reward, done, info = env.step(action)
+
+        states.append(next_state)
+
+        state = next_state
+
         if done:
-            env.reset()
+            state = env.reset()
 
-    if not states:
-        print("No states collected for SHAP analysis")
-        return None
+    return np.array(states)
 
-    states = np.array(states)
-    state_shape = states.shape[1:]
 
-    # Convert observations to flat feature vectors for SHAP
-    if states.ndim == 3:
-        states_flat = states.reshape(states.shape[0], -1)
-    else:
-        states_flat = states
+# =========================================================
+# EXTRACT TECHNICAL FEATURES ONLY
+# =========================================================
 
-    def reshape_for_model(flat_states):
-        flat_states = np.array(flat_states)
-        if flat_states.ndim == 1:
-            flat_states = flat_states.reshape(1, -1)
-        if states.ndim == 3:
-            return flat_states.reshape((-1,) + state_shape)
-        return flat_states
+def extract_stock_features(states, stock_idx):
 
-    # Create SHAP explainer
-    def predict_fn(flat_states):
-        obs = reshape_for_model(flat_states)
-        actions, _ = model.predict(obs, deterministic=True)
-        return actions
-
-    # Use a subset for explanation to avoid memory issues
-    background_states = states_flat[:min(50, len(states_flat))]
-    test_states = states_flat[:min(20, len(states_flat))]
-
-    try:
-        explainer = shap.KernelExplainer(predict_fn, background_states)
-        shap_values = explainer.shap_values(test_states, max_evals=max_evals)
-
-        print(f"SHAP analysis completed. Shape: {np.array(shap_values).shape}")
-        return shap_values, test_states
-
-    except Exception as e:
-        print(f"Error computing SHAP values: {e}")
-        return None
-
-def plot_shap_summary(shap_values, feature_names, algo, seed, save_path='results/plots/'):
     """
-    Create and save SHAP summary plot.
+    states shape:
+    (n_samples, 19, 10)
+
+    first 10 rows:
+        covariance matrix
+
+    last 9 rows:
+        technical indicators
     """
-    try:
-        import shap
 
-        os.makedirs(save_path, exist_ok=True)
+    technical_rows = states[:, 10:, :]
 
-        plt.figure(figsize=(12, 8))
-        shap.summary_plot(shap_values, feature_names=feature_names, show=False)
-        plt.title(f'SHAP Summary Plot - {algo} (Seed {seed})')
-        plt.tight_layout()
-        plt.savefig(os.path.join(save_path, f'{algo.lower()}_shap_summary_seed_{seed}.png'), dpi=300, bbox_inches='tight')
-        plt.close()
+    # extract one stock only
+    X = technical_rows[:, :, stock_idx]
 
-        print(f"SHAP summary plot saved to {save_path}")
+    return X
 
-    except Exception as e:
-        print(f"Error creating SHAP plot: {e}")
 
-def explain_model(algo, seed, processed_data_path='dataset/processed/processed.csv', model_path='results/models/', n_samples=100):
-    """
-    Main function to explain a trained model using SHAP.
-    """
-    print(f"Explaining {algo} model (seed {seed})...")
+# =========================================================
+# SHAP EXPLAINER
+# =========================================================
 
-    # Load trained model
-    model = load_trained_model(algo, seed, model_path)
+def create_predict_function(model, stock_idx):
 
-    # Create test environment
-    env = create_test_environment(processed_data_path, seed)
+    def predict_fn(X):
 
-    # Compute SHAP values
-    result = compute_shap_explanation(model, env, n_samples)
+        X = np.array(X)
 
-    if result is not None:
-        shap_values, test_states = result
+        batch_size = X.shape[0]
 
-        # Create feature names for plotting
-        stock_dim = env.state.shape[1]
-        state_rows = env.state.shape[0]
-        feature_names = []
+        predictions = []
 
-        # Generate names for flattened covariance and technical indicator rows
-        for row in range(state_rows):
-            if row < stock_dim:
-                for col in range(stock_dim):
-                    feature_names.append(f'cov_{row}_{col}')
-            else:
-                indicator_idx = row - stock_dim
-                indicator_name = TECHNICAL_INDICATORS[indicator_idx]
-                for col in range(stock_dim):
-                    feature_names.append(f'{indicator_name}_{col}')
+        for i in range(batch_size):
 
-        # Plot SHAP summary
-        plot_shap_summary(shap_values, feature_names, algo, seed)
+            technical_part = X[i]
 
-        print(f"SHAP explanation completed for {algo} (seed {seed})")
-    else:
-        print("SHAP analysis failed")
+            full_state = np.zeros((19, 10))
 
-def main():
-    parser = argparse.ArgumentParser(description="Explain trained RL models using SHAP")
-    parser.add_argument('--algo', type=str, required=True, choices=['A2C', 'PPO', 'DDPG', 'SAC', 'TD3'],
-                       help='Algorithm to explain')
-    parser.add_argument('--seed', type=int, required=True, help='Seed of the trained model')
-    parser.add_argument('--processed_data_path', type=str, default='dataset/processed/processed.csv',
-                       help='Path to processed dataset CSV file')
-    parser.add_argument('--model_path', type=str, default='results/models/',
-                       help='Path to trained models')
-    parser.add_argument('--n_samples', type=int, default=100,
-                       help='Number of samples for SHAP analysis')
+            # keep covariance = 0
+            # only inject technical indicators
+            full_state[10:, stock_idx] = technical_part
 
-    args = parser.parse_args()
+            action, _ = model.predict(full_state, deterministic=True)
 
-    explain_model(
-        algo=args.algo,
-        seed=args.seed,
-        processed_data_path=args.processed_data_path,
-        model_path=args.model_path,
-        n_samples=args.n_samples
+            predictions.append(action[stock_idx])
+
+        return np.array(predictions)
+
+    return predict_fn
+
+
+# =========================================================
+# MAIN SHAP FUNCTION
+# =========================================================
+
+def explain_stock(
+    model_path,
+    processed_data_path,
+    stock_name='MWG',
+    n_samples=200,
+    background_size=50,
+    seed=42
+):
+
+    os.makedirs("results/shap", exist_ok=True)
+
+    stock_idx = STOCKS.index(stock_name)
+
+    print(f"\nExplaining stock: {stock_name}")
+    print(f"Stock index: {stock_idx}")
+
+    # -----------------------------------------------------
+    # LOAD MODEL
+    # -----------------------------------------------------
+
+    model = PPO.load(model_path)
+
+    # -----------------------------------------------------
+    # ENV
+    # -----------------------------------------------------
+
+    env = create_environment(processed_data_path, seed)
+
+    # -----------------------------------------------------
+    # COLLECT STATES
+    # -----------------------------------------------------
+
+    print("\nCollecting states...")
+
+    states = collect_states(model, env, n_samples)
+
+    print("States shape:", states.shape)
+
+    # -----------------------------------------------------
+    # EXTRACT FEATURES
+    # -----------------------------------------------------
+
+    X = extract_stock_features(states, stock_idx)
+
+    print("Feature matrix shape:", X.shape)
+
+    # -----------------------------------------------------
+    # SHAP
+    # -----------------------------------------------------
+
+    predict_fn = create_predict_function(model, stock_idx)
+
+    background = X[:background_size]
+
+    test_samples = X[background_size:background_size + 50]
+
+    print("\nCreating SHAP explainer...")
+
+    explainer = shap.KernelExplainer(
+        predict_fn,
+        background
     )
 
+    print("\nComputing SHAP values...")
+
+    shap_values = explainer.shap_values(
+        test_samples,
+        nsamples=100
+    )
+
+    shap_values = np.array(shap_values)
+
+    print("SHAP values shape:", shap_values.shape)
+
+    # =====================================================
+    # SUMMARY PLOT
+    # =====================================================
+
+    print("\nCreating summary plot...")
+
+    plt.figure(figsize=(12, 8))
+
+    shap.summary_plot(
+        shap_values,
+        test_samples,
+        feature_names=TECHNICAL_INDICATORS,
+        show=False
+    )
+
+    plt.title(f"SHAP Summary Plot - {stock_name}")
+
+    plt.tight_layout()
+
+    plt.savefig(
+        f"results/shap/shap_summary_{stock_name}.png",
+        dpi=300,
+        bbox_inches='tight'
+    )
+
+    plt.close()
+
+    # =====================================================
+    # WATERFALL PLOT
+    # =====================================================
+
+    print("\nCreating waterfall plot...")
+
+    explanation = shap.Explanation(
+        values=shap_values[0],
+        base_values=explainer.expected_value,
+        data=test_samples[0],
+        feature_names=TECHNICAL_INDICATORS
+    )
+
+    plt.figure(figsize=(10, 6))
+
+    shap.plots.waterfall(
+        explanation,
+        show=False
+    )
+
+    plt.tight_layout()
+
+    plt.savefig(
+        f"results/shap/shap_waterfall_{stock_name}.png",
+        dpi=300,
+        bbox_inches='tight'
+    )
+
+    plt.close()
+
+    print("\nDONE")
+    print(f"Saved summary plot:")
+    print(f"results/shap/shap_summary_{stock_name}.png")
+
+    print(f"\nSaved waterfall plot:")
+    print(f"results/shap/shap_waterfall_{stock_name}.png")
+
+
+# =========================================================
+# RUN
+# =========================================================
+
 if __name__ == "__main__":
-    main()
+
+    explain_stock(
+        model_path="results/models/ppo_seed_42.zip",
+        processed_data_path="dataset/processed/processed.csv",
+        stock_name="MWG",
+        n_samples=200,
+        background_size=50,
+        seed=42
+    )
