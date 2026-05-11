@@ -292,13 +292,30 @@ def explain_stock(
 # RUN
 # =========================================================
 
+import argparse
+
 if __name__ == "__main__":
 
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--algo", type=str, default="PPO")
+    parser.add_argument("--seed", type=int, default=42)
+
+    parser.add_argument(
+        "--processed_data_path",
+        type=str,
+        required=True
+    )
+
+    args = parser.parse_args()
+
+    model_path = f"results/models/{args.algo.lower()}_seed_{args.seed}.zip"
+
     explain_stock(
-        model_path="results/models/ppo_seed_42.zip",
-        processed_data_path="dataset/processed/processed.csv",
+        model_path=model_path,
+        processed_data_path=args.processed_data_path,
         stock_name="MWG",
         n_samples=200,
         background_size=50,
-        seed=42
+        seed=args.seed
     )
