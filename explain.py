@@ -155,11 +155,6 @@ def explain_stock(
 
     os.makedirs("results/shap", exist_ok=True)
 
-    stock_idx = stocks.index(stock_name)
-
-    print(f"\nExplaining stock: {stock_name}")
-    print(f"Stock index: {stock_idx}")
-
     # -----------------------------------------------------
     # LOAD MODEL
     # -----------------------------------------------------
@@ -171,6 +166,11 @@ def explain_stock(
     # -----------------------------------------------------
 
     env, stocks = create_environment(processed_data_path, seed)
+
+    stock_idx = stocks.index(stock_name)
+
+    print(f"\nExplaining stock: {stock_name}")
+    print(f"Stock index: {stock_idx}")
 
     # -----------------------------------------------------
     # COLLECT STATES
