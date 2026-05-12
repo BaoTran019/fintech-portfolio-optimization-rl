@@ -3,7 +3,13 @@ import shap
 import numpy as np
 import matplotlib.pyplot as plt
 
-from stable_baselines3 import PPO
+from stable_baselines3 import (
+    PPO,
+    A2C,
+    DDPG,
+    SAC,
+    TD3
+)
 
 from data.load_data import load_processed_data
 from data.preprocess import split_data
@@ -139,12 +145,39 @@ def create_predict_function(model, stock_idx):
 
     return predict_fn
 
+# =========================================================
+# LOAD MODEL
+# =========================================================
+
+def load_model(algo, model_path):
+
+    algo = algo.upper()
+
+    if algo == "PPO":
+        return PPO.load(model_path, device="cpu")
+
+    elif algo == "A2C":
+        return A2C.load(model_path, device="cpu")
+
+    elif algo == "DDPG":
+        return DDPG.load(model_path, device="cpu")
+
+    elif algo == "SAC":
+        return SAC.load(model_path, device="cpu")
+
+    elif algo == "TD3":
+        return TD3.load(model_path, device="cpu")
+
+    else:
+        raise ValueError(f"Unsupported algorithm: {algo}")
+
 
 # =========================================================
 # MAIN SHAP FUNCTION
 # =========================================================
 
 def explain_stock(
+    algo,
     model_path,
     processed_data_path,
     stock_name='MWG',
@@ -159,7 +192,7 @@ def explain_stock(
     # LOAD MODEL
     # -----------------------------------------------------
 
-    model = PPO.load(model_path)
+    model = load_model(algo, model_path)
 
     # -----------------------------------------------------
     # ENV
@@ -286,6 +319,7 @@ def explain_stock(
 # Explain all stocks
 # =========================================================
 def explain_all_stocks(
+    algo,
     model_path,
     processed_data_path,
     n_samples=200,
@@ -308,6 +342,7 @@ def explain_all_stocks(
         print("="*60)
 
         explain_stock(
+            algo=algo,
             model_path=model_path,
             processed_data_path=processed_data_path,
             stock_name=stock_name,
@@ -345,6 +380,7 @@ if __name__ == "__main__":
     )
 
     explain_all_stocks(
+        algo=args.algo,
         model_path=model_path,
         processed_data_path=args.processed_data_path,
         n_samples=200,
