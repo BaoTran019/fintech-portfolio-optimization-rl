@@ -24,6 +24,37 @@ def compute_min_variance_weights(cov_matrix):
         weights = weights / weights.sum()
     return weights
 
+def build_vn30_benchmark(
+    vn30_path='dataset/vn30.xlsx',
+    initial_amount=10000000
+):
+
+    vn30 = pd.read_excel(vn30_path)
+
+    vn30['date'] = pd.to_datetime(vn30['date'])
+
+    vn30 = vn30.sort_values('date')
+
+    # Daily return
+    vn30['benchmark_return'] = (
+        vn30['close'].pct_change()
+    )
+
+    vn30 = vn30.dropna().reset_index(drop=True)
+
+    # Portfolio value
+    vn30['benchmark_value'] = (
+        (1 + vn30['benchmark_return']).cumprod()
+        * initial_amount
+    )
+
+    benchmark_df = vn30[[
+        'date',
+        'benchmark_return',
+        'benchmark_value'
+    ]]
+
+    return benchmark_df
 
 def build_min_variance_benchmark(test, initial_amount=10000000):
     price_matrix = test.pivot_table(index='date', columns='tic', values='close')
@@ -52,7 +83,7 @@ def build_min_variance_benchmark(test, initial_amount=10000000):
     return benchmark_df, weight_df
 
 
-def plot_comparison(df_daily_return, benchmark_df, algo, seed, save_path='results/'):
+def plot_min_variance_comparison(df_daily_return, benchmark_df, algo, seed, save_path='results/'):
     os.makedirs(save_path, exist_ok=True)
     account_values = (1 + df_daily_return['daily_return']).cumprod() * 10000000
     benchmark_values = benchmark_df['benchmark_value']
@@ -79,6 +110,103 @@ def plot_comparison(df_daily_return, benchmark_df, algo, seed, save_path='result
     plt.savefig(os.path.join(save_path, f'{algo.lower()}_seed_{seed}_cumulative_return_comparison.png'))
     plt.close()
 
+def plot_vn30_comparison(
+    df_daily_return,
+    vn30_df,
+    algo,
+    seed,
+    save_path='results/'
+):
+
+    os.makedirs(save_path, exist_ok=True)
+
+    # RL account value
+    rl_account_values = (
+        (1 + df_daily_return['daily_return']).cumprod()
+        * 10000000
+    )
+
+    # VN30 benchmark value
+    vn30_values = vn30_df['benchmark_value']
+
+    # ==============================
+    # ACCOUNT VALUE PLOT
+    # ==============================
+
+    plt.figure(figsize=(10, 6))
+
+    plt.plot(
+        df_daily_return['date'],
+        rl_account_values,
+        label=f'{algo} Portfolio'
+    )
+
+    plt.plot(
+        vn30_df['date'],
+        vn30_values,
+        label='VN30 Benchmark'
+    )
+
+    plt.title(
+        f'VN30 Benchmark Comparison - {algo} Seed {seed}'
+    )
+
+    plt.xlabel('Date')
+
+    plt.ylabel('Account Value')
+
+    plt.legend()
+
+    plt.grid(True)
+
+    plt.savefig(
+        os.path.join(
+            save_path,
+            f'{algo.lower()}_seed_{seed}_vn30_account_value_comparison.png'
+        )
+    )
+
+    plt.close()
+
+    # ==============================
+    # CUMULATIVE RETURN PLOT
+    # ==============================
+
+    plt.figure(figsize=(10, 6))
+
+    plt.plot(
+        df_daily_return['date'],
+        (1 + df_daily_return['daily_return']).cumprod() - 1,
+        label=f'{algo} Portfolio'
+    )
+
+    plt.plot(
+        vn30_df['date'],
+        (vn30_df['benchmark_value']
+         / vn30_df['benchmark_value'].iloc[0]) - 1,
+        label='VN30 Benchmark'
+    )
+
+    plt.title(
+        f'VN30 Cumulative Return Comparison - {algo} Seed {seed}'
+    )
+
+    plt.xlabel('Date')
+
+    plt.ylabel('Cumulative Return')
+
+    plt.legend()
+
+    plt.grid(True)
+
+    plt.savefig(
+        os.path.join(
+            save_path,
+            f'{algo.lower()}_seed_{seed}_vn30_cumulative_return_comparison.png'
+        )
+    )
+
+    plt.close()
 
 def plot_stock_distribution(df_actions, algo, seed, save_path='results/'):
     os.makedirs(save_path, exist_ok=True)
@@ -141,8 +269,15 @@ def backtest(algo, seed, processed_data_path='dataset/processed/processed.csv', 
     metrics.to_csv(f'results/metrics/{algo.lower()}_seed_{seed}_metrics.csv')
 
     # Generate benchmark and plots
+    
+    # Compare with min-variance
     benchmark_df, benchmark_weights = build_min_variance_benchmark(test)
-    plot_comparison(df_daily_return, benchmark_df, algo, seed, save_path='results/')
+    plot_min_variance_comparison(df_daily_return, benchmark_df, algo, seed, save_path='results/')
+
+    # Compare with vn30
+    vn30_df = build_vn30_benchmark(vn30_path='dataset/vn30.xlsx')
+    plot_vn30_comparison(df_daily_return, vn30_df, algo, seed, save_path='results/')
+
     plot_stock_distribution(df_actions, algo, seed, save_path='results/')
     benchmark_weights.to_csv(f'results/{algo.lower()}_seed_{seed}_benchmark_weights.csv')
     
