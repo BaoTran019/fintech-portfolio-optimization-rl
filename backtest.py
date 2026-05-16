@@ -208,15 +208,99 @@ def plot_vn30_comparison(
 
     plt.close()
 
-def plot_stock_distribution(df_actions, algo, seed, save_path='results/'):
-    os.makedirs(save_path, exist_ok=True)
-    latest_weights = df_actions.iloc[-1].values
-    tickers = df_actions.columns.tolist()
+def plot_stock_distribution(
+    df_actions,
+    algo,
+    seed,
+    save_path='results/'
+):
 
-    plt.figure(figsize=(10, 10))
-    plt.pie(latest_weights, labels=tickers, autopct='%1.1f%%', startangle=140)
-    plt.title(f'Stock Distribution - {algo} Seed {seed}')
-    plt.savefig(os.path.join(save_path, f'{algo.lower()}_seed_{seed}_distribution.png'))
+    os.makedirs(save_path, exist_ok=True)
+
+    # ==========================================
+    # Ensure datetime index if possible
+    # ==========================================
+
+    df_plot = df_actions.copy()
+
+    try:
+        df_plot.index = pd.to_datetime(df_plot.index)
+    except:
+        pass
+
+    # ==========================================
+    # STACKED AREA PLOT
+    # ==========================================
+
+    plt.figure(figsize=(16, 8))
+
+    plt.stackplot(
+        df_plot.index,
+        df_plot.T.values,
+        labels=df_plot.columns
+    )
+
+    plt.title(
+        f'Portfolio Allocation Over Time - {algo} Seed {seed}',
+        fontsize=14
+    )
+
+    plt.xlabel('Date', fontsize=12)
+
+    plt.ylabel('Portfolio Weight', fontsize=12)
+
+    plt.legend(
+        loc='upper left',
+        bbox_to_anchor=(1.01, 1),
+        fontsize=9
+    )
+
+    plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    plt.savefig(
+        os.path.join(
+            save_path,
+            f'{algo.lower()}_seed_{seed}_allocation_over_time.png'
+        )
+    )
+
+    plt.close()
+
+    # ==========================================
+    # OPTIONAL:
+    # AVERAGE PORTFOLIO WEIGHT
+    # ==========================================
+
+    avg_weights = df_plot.mean()
+
+    plt.figure(figsize=(10, 6))
+
+    avg_weights.sort_values(ascending=False).plot(
+        kind='bar'
+    )
+
+    plt.title(
+        f'Average Portfolio Allocation - {algo} Seed {seed}',
+        fontsize=14
+    )
+
+    plt.xlabel('Stock')
+
+    plt.ylabel('Average Weight')
+
+    plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    plt.savefig(
+        os.path.join(
+            save_path,
+            f'{algo.lower()}_seed_{seed}_average_allocation.png'
+        )
+    )
+
     plt.close()
 
 
@@ -269,7 +353,7 @@ def backtest(algo, seed, processed_data_path='dataset/processed/processed.csv', 
     metrics.to_csv(f'results/metrics/{algo.lower()}_seed_{seed}_metrics.csv')
 
     # Generate benchmark and plots
-    
+
     # Compare with min-variance
     benchmark_df, benchmark_weights = build_min_variance_benchmark(test)
     plot_min_variance_comparison(df_daily_return, benchmark_df, algo, seed, save_path='results/')
