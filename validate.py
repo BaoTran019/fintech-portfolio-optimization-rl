@@ -95,6 +95,7 @@ def compute_metrics(df_daily_return, initial_amount=10000000):
     returns = df_daily_return['daily_return']
     cumulative_return = (1 + returns).prod() - 1
     annual_return = ((1 + cumulative_return) ** (252 / len(returns))) - 1 if len(returns) > 0 else 0
+    volatility = returns.std() * (252 ** 0.5)
     sharpe = (252 ** 0.5) * returns.mean() / returns.std() if returns.std() != 0 else 0
     account_value = initial_amount * (1 + returns).cumprod()
     peak_value = account_value.cummax()
@@ -104,6 +105,7 @@ def compute_metrics(df_daily_return, initial_amount=10000000):
     metrics = pd.Series({
         'Annual Return': annual_return,
         'Cumulative Return': cumulative_return,
+        'Volatility': volatility,
         'Sharpe': sharpe,
         'Mean Return': returns.mean(),
         'Std Return': returns.std(),
