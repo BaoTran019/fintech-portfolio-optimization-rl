@@ -13,6 +13,7 @@ def get_parser():
     parser.add_argument('--data_source', type=str, default='csv', choices=['api', 'csv'], help='Data source (default: csv)')
     parser.add_argument('--data_path', type=str, default='dataset/5_vn30_vnsi_symbols_data.xlsx', help='Path to main data file')
     parser.add_argument('--vnindex_path', type=str, default='dataset/vnindex.xlsx', help='Path to VNINDEX data file')
+    parser.add_argument('--vn30_path', type=str, default='dataset/vn30.xlsx', help='Path to VN30 data file')
     parser.add_argument('--processed_data_path', type=str, default='dataset/processed/processed.csv', help='Path to processed dataset CSV file')
     parser.add_argument('--train_start', type=str, default='2015-01-01', help='Training split start date (YYYY-MM-DD)')
     parser.add_argument('--train_end', type=str, default='2023-12-31', help='Training split end date (YYYY-MM-DD)')

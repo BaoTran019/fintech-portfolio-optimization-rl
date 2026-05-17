@@ -25,7 +25,8 @@ def compute_min_variance_weights(cov_matrix):
     return weights
 
 def build_vn30_benchmark(
-    vn30_path='dataset/vn30.xlsx',
+    vn30_path,
+    df_daily_return,
     initial_amount=10000000
 ):
 
@@ -34,6 +35,11 @@ def build_vn30_benchmark(
     vn30['date'] = pd.to_datetime(vn30['date'])
 
     vn30 = vn30.sort_values('date')
+
+    test_start = df_daily_return['date'].min()
+    test_end = df_daily_return['date'].max()
+
+    vn30 = vn30[(vn30["date"] >= test_start) & (vn30["date"] <= test_end)].copy()
 
     # Daily return
     vn30['benchmark_return'] = (
@@ -304,7 +310,7 @@ def plot_stock_distribution(
     plt.close()
 
 
-def backtest(algo, seed, processed_data_path='dataset/processed/processed.csv', config=None):
+def backtest(algo, seed, processed_data_path='dataset/processed/processed.csv', vn30_path='dataset/vn30.xlsx', config=None):
     # Load processed data
     df = load_processed_data(processed_data_path)
     
@@ -359,7 +365,7 @@ def backtest(algo, seed, processed_data_path='dataset/processed/processed.csv', 
     plot_min_variance_comparison(df_daily_return, benchmark_df, algo, seed, save_path='results/')
 
     # Compare with vn30
-    vn30_df = build_vn30_benchmark(vn30_path='dataset/vn30.xlsx')
+    vn30_df = build_vn30_benchmark(vn30_path, df_daily_return)
     plot_vn30_comparison(df_daily_return, vn30_df, algo, seed, save_path='results/')
 
     plot_stock_distribution(df_actions, algo, seed, save_path='results/')
@@ -372,7 +378,7 @@ def main():
     parser = get_parser()
     args = parser.parse_args()
     
-    backtest(args.algo, args.seed, args.processed_data_path, args)
+    backtest(args.algo, args.seed, args.processed_data_path, args.vn30_path, args)
 
 if __name__ == "__main__":
     main()
