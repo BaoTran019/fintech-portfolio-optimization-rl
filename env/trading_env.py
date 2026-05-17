@@ -153,9 +153,9 @@ class StockPortfolioEnv(gym.Env):
             )
 
             # Debug info
-            print(f"Turnover: {turnover:.4f}")
-            print(f"Transaction cost: {transaction_cost:.6f}")
-            print(f"Portfolio return after cost: {portfolio_return:.6f}")
+            #print(f"Turnover: {turnover:.4f}")
+            #print(f"Transaction cost: {transaction_cost:.6f}")
+            #print(f"Portfolio return after cost: {portfolio_return:.6f}")
 
             # Update portfolio value
             new_portfolio_value = self.portfolio_value * (1 + portfolio_return)
