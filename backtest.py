@@ -3,15 +3,32 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from config.parser import get_parser
-from validate import load_model, model_predict, compute_metrics
+from validate import model_predict, compute_metrics
 from data.load_data import load_processed_data
 from data.preprocess import split_data
 from env.trading_env import StockPortfolioEnv
+from stable_baselines3 import A2C, PPO, DDPG, SAC, TD3
 
 TECHNICAL_INDICATORS = [
     'macd', 'boll_ub', 'boll_lb', 'rsi_30', 'cci_30', 'dx_30',
     'close_30_sma', 'close_60_sma', 'change'
 ]
+
+def load_model(algo, seed, save_path='results/models/'):
+    model_path = os.path.join(save_path, f'{algo.lower()}_seed_{seed}_best.zip')
+    if algo == 'A2C':
+        model = A2C.load(model_path)
+    elif algo == 'PPO':
+        model = PPO.load(model_path)
+    elif algo == 'DDPG':
+        model = DDPG.load(model_path)
+    elif algo == 'SAC':
+        model = SAC.load(model_path)
+    elif algo == 'TD3':
+        model = TD3.load(model_path)
+    else:
+        raise ValueError(f"Unsupported algorithm: {algo}")
+    return model
 
 def compute_min_variance_weights(cov_matrix):
     cov_matrix = np.array(cov_matrix, dtype=float)

@@ -22,5 +22,5 @@ def get_parser():
     parser.add_argument('--test_start', type=str, default='2024-01-01', help='Test split start date (YYYY-MM-DD)')
     parser.add_argument('--test_end', type=str, default='2025-12-31', help='Test split end date (YYYY-MM-DD)')
     parser.add_argument('--save_path', type=str, default='results/models/', help='Path to save models')
-    
+    parser.add_argument('--eval_freq', type=int, default=25000, help='Evaluation frequency in timesteps (default: 25000)')
     return parser
