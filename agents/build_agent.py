@@ -1,23 +1,20 @@
-from stable_baselines3 import A2C, PPO, DDPG, SAC, TD3
+from finrl.agents.stablebaselines3.models import DRLAgent
 
 def build_agent(algo, env, seed):
     """
-    Build and return the RL agent based on algorithm.
+    Build and return the RL agent and model based on algorithm.
     """
-    if algo == 'A2C':
-        # Params from notebook
+    algo_key = algo.lower()
+    agent = DRLAgent(env=env)
+
+    if algo_key == 'a2c':
         model_kwargs = {"n_steps": 10, "ent_coef": 0.005, "learning_rate": 0.0001}
-        model = A2C("MlpPolicy", env, seed=seed, **model_kwargs)
-    elif algo == 'PPO':
+    elif algo_key == 'ppo':
         model_kwargs = {"n_steps": 2048, "ent_coef": 0.005, "learning_rate": 0.0001, "batch_size": 128}
-        model = PPO("MlpPolicy", env, seed=seed, **model_kwargs)
-    elif algo == 'DDPG':
-        model = DDPG("MlpPolicy", env, seed=seed)
-    elif algo == 'SAC':
-        model = SAC("MlpPolicy", env, seed=seed)
-    elif algo == 'TD3':
-        model = TD3("MlpPolicy", env, seed=seed)
+    elif algo_key in ('ddpg', 'sac', 'td3'):
+        model_kwargs = {}
     else:
         raise ValueError(f"Unsupported algorithm: {algo}")
-    
-    return model
+
+    model = agent.get_model(algo_key, model_kwargs=model_kwargs)
+    return agent, model

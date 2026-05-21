@@ -129,6 +129,7 @@ Thumbs.db
 # Large data files (uncomment if needed)
 dataset/*.xlsx
 !dataset/vnindex.xlsx
+!dataset/vn30.xlsx
 dataset/*.csv
 
 # Temporary files

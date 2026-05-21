@@ -97,8 +97,24 @@ class StockPortfolioEnv(gym.Env):
 
         else:
             # Normalize actions to sum to 1
-            weights = self.softmax_normalization(actions) 
+            weights = self.softmax_normalization(actions)
+
+            # Previous portfolio weights
+            previous_weights = self.actions_memory[-1]
+
+            # Calculate portfolio turnover
+            turnover = np.sum(
+                np.abs(weights - previous_weights)
+            )
+
+            # Transaction cost
+            transaction_cost = (
+                turnover * self.transaction_cost_pct
+            )
+
+            # Save current weights
             self.actions_memory.append(weights)
+
             last_day_memory = self.data
 
             # Load next state
@@ -120,8 +136,27 @@ class StockPortfolioEnv(gym.Env):
                 
             self.state = np.append(np.array(self.covs), tech_data_list, axis=0)
             
-            # Calculate portfolio return
-            portfolio_return = sum(((self.data.close.values / last_day_memory.close.values) - 1) * weights)
+            # Calculate stock returns
+            stock_returns = (
+                (self.data.close.values /
+                last_day_memory.close.values) - 1
+            )
+
+            # Portfolio return before cost
+            portfolio_return = np.sum(
+                stock_returns * weights
+            )
+
+            # Subtract transaction cost
+            portfolio_return = (
+                portfolio_return - transaction_cost
+            )
+
+            # Debug info
+            #print(f"Turnover: {turnover:.4f}")
+            #print(f"Transaction cost: {transaction_cost:.6f}")
+            #print(f"Portfolio return after cost: {portfolio_return:.6f}")
+
             # Update portfolio value
             new_portfolio_value = self.portfolio_value * (1 + portfolio_return)
             self.portfolio_value = new_portfolio_value
