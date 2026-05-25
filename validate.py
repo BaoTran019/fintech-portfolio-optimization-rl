@@ -54,7 +54,7 @@ def validate(algo, seed, processed_data_path='dataset/processed/processed.csv', 
         "stock_dim": stock_dimension, 
         "tech_indicator_list": TECHNICAL_INDICATORS, 
         "action_space": stock_dimension, 
-        "reward_scaling": 1e-4
+        "reward_scaling": 1e-2
     }
     
     env = StockPortfolioEnv(df=validate, **env_kwargs)
