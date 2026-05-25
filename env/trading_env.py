@@ -40,6 +40,7 @@ class StockPortfolioEnv(gym.Env):
         self.state_space = state_space
         self.action_space = action_space
         self.tech_indicator_list = tech_indicator_list
+        self.excess_return_memory = [0]
 
         # action_space normalization and shape is self.stock_dim
         self.action_space = spaces.Box(low=0, high=1, shape=(self.action_space,)) 
@@ -150,6 +151,7 @@ class StockPortfolioEnv(gym.Env):
                 benchmark_return = self.data['vn30_return'].values[0]
 
             excess_return = portfolio_return - benchmark_return
+            self.excess_return_memory.append(excess_return)
 
             # Update portfolio value
             new_portfolio_value = self.portfolio_value * (1 + portfolio_return)
@@ -163,13 +165,15 @@ class StockPortfolioEnv(gym.Env):
             # Reward calculation
             lookback_window = 63
 
-            if len(self.portfolio_return_memory) >= lookback_window:
+            if len(self.excess_return_memory) >= lookback_window:
 
-                recent_returns = np.array(
-                    self.portfolio_return_memory[-lookback_window:]
+                recent_excess_returns = np.array(
+                    self.excess_return_memory[-lookback_window:]
                 )
 
-                volatility = recent_returns.std() + 1e-6
+                volatility = (
+                    recent_excess_returns.std() + 1e-6
+                )
 
                 reward = excess_return / volatility
 
@@ -182,6 +186,7 @@ class StockPortfolioEnv(gym.Env):
         return self.state, self.reward, self.terminal, {}
 
     def reset(self):
+        self.excess_return_memory = [0]
         self.asset_memory = [self.initial_amount]
         self.day = 0
         self.data = self.df.loc[self.day, :]
