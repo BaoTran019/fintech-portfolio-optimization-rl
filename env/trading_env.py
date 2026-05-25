@@ -99,20 +99,17 @@ class StockPortfolioEnv(gym.Env):
             # Normalize actions to sum to 1
             weights = self.softmax_normalization(actions)
 
-            # Previous portfolio weights
+            # Calculate portfolio turnover
+
             previous_weights = self.actions_memory[-1]
 
-            # Calculate portfolio turnover
             turnover = np.sum(
                 np.abs(weights - previous_weights)
             )
 
-            # Transaction cost
             transaction_cost = (
                 turnover * self.transaction_cost_pct
-            )
-
-            # Save current weights
+            ) 
             self.actions_memory.append(weights)
 
             last_day_memory = self.data
@@ -136,26 +133,23 @@ class StockPortfolioEnv(gym.Env):
                 
             self.state = np.append(np.array(self.covs), tech_data_list, axis=0)
             
-            # Calculate stock returns
-            stock_returns = (
-                (self.data.close.values /
-                last_day_memory.close.values) - 1
-            )
-
-            # Portfolio return before cost
+            # Calculate portfolio return
             portfolio_return = np.sum(
-                stock_returns * weights
+                ((self.data.close.values /
+                last_day_memory.close.values) - 1)
+                * weights
             )
 
-            # Subtract transaction cost
             portfolio_return = (
                 portfolio_return - transaction_cost
             )
 
-            # Debug info
-            #print(f"Turnover: {turnover:.4f}")
-            #print(f"Transaction cost: {transaction_cost:.6f}")
-            #print(f"Portfolio return after cost: {portfolio_return:.6f}")
+            if isinstance(self.data, pd.Series):
+                benchmark_return = self.data['vn30_return']
+            else:
+                benchmark_return = self.data['vn30_return'].values[0]
+
+            excess_return = portfolio_return - benchmark_return
 
             # Update portfolio value
             new_portfolio_value = self.portfolio_value * (1 + portfolio_return)
@@ -167,17 +161,23 @@ class StockPortfolioEnv(gym.Env):
             self.asset_memory.append(new_portfolio_value)
 
             # Reward calculation
-            lookback_window = 63  # Use 3 months for stability
+            lookback_window = 63
+
             if len(self.portfolio_return_memory) >= lookback_window:
-                recent_returns = np.array(self.portfolio_return_memory[-lookback_window:])
-                std_return = recent_returns.std() + 1e-6  # Avoid division by zero
-                mean_return = recent_returns.mean()
-                
-                # Calculate Sharpe and scale
-                sharpe = mean_return / std_return
-                self.reward = sharpe * self.reward_scaling
+
+                recent_returns = np.array(
+                    self.portfolio_return_memory[-lookback_window:]
+                )
+
+                volatility = recent_returns.std() + 1e-6
+
+                reward = excess_return / volatility
+
             else:
-                self.reward = portfolio_return * 100
+
+                reward = excess_return
+
+            self.reward = reward * self.reward_scaling
 
         return self.state, self.reward, self.terminal, {}
 

@@ -45,7 +45,7 @@ def train_single_seed(algo, timesteps, seed, processed_data_path, save_path, con
         "stock_dim": stock_dimension, 
         "tech_indicator_list": TECHNICAL_INDICATORS, 
         "action_space": stock_dimension, 
-        "reward_scaling": 1e-4,
+        "reward_scaling": 1e-2,
         "seed": seed
     }
     

@@ -65,8 +65,8 @@ def add_vnindex(df, vnindex_df):
     """
     vnindex_df = vnindex_df.copy()
     vnindex_df['date'] = pd.to_datetime(vnindex_df['date'])
-    vnindex_df['vni_return'] = vnindex_df['close'].pct_change() * 100
-    vnindex_context = vnindex_df[['date', 'vni_return']].fillna(0)
+    vnindex_df['vn30_return'] = vnindex_df['close'].pct_change() * 100
+    vnindex_context = vnindex_df[['date', 'vn30_return']].fillna(0)
     df = df.merge(vnindex_context, on='date', how='left')
     return df
 
