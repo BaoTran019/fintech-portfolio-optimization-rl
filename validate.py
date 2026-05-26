@@ -101,12 +101,33 @@ def compute_metrics(df_daily_return, initial_amount=10000000):
     peak_value = account_value.cummax()
     drawdown = (account_value - peak_value) / peak_value
     max_drawdown = drawdown.min()
+    downside_returns = returns[returns < 0]
+
+    downside_std = downside_returns.std()
+
+    sortino = (
+        (252 ** 0.5) * returns.mean() / downside_std
+        if downside_std != 0 else 0
+    )
+
+    calmar = (
+        annual_return / abs(max_drawdown)
+        if max_drawdown != 0 else 0
+    )
+
+    win_rate = (
+        (returns > 0).sum() / len(returns)
+        if len(returns) > 0 else 0
+    )
 
     metrics = pd.Series({
         'Annual Return': annual_return,
         'Cumulative Return': cumulative_return,
         'Volatility': volatility,
         'Sharpe': sharpe,
+        'Sortino Ratio': sortino,
+        'Calmar Ratio': calmar,
+        'Win Rate': win_rate,
         'Mean Return': returns.mean(),
         'Std Return': returns.std(),
         'Max Drawdown': max_drawdown
