@@ -1,3 +1,7 @@
+## Report
+
+[📄 View Report](Poster.pdf)
+
 ## Workflow
 
 1. **Train** your models: `python train.py --algo PPO --timesteps 160000 --seed 42`
