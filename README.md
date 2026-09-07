@@ -1,6 +1,6 @@
 ## Report
 
-[📄 View Report](Poster.pdf)
+![Poster](poster.png)
 
 ## Workflow
 
